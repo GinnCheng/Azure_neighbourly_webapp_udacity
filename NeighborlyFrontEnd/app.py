@@ -1,139 +1,239 @@
-import logging.config
-import os
-from flask import Flask, Blueprint, request, jsonify, render_template, redirect, url_for
-from flask_bootstrap import Bootstrap
-import settings
-import requests
+# neighborly_dash_local_fixed.py
+import dash
+from dash import html, dcc, Input, Output, State, callback_context
+import dash_bootstrap_components as dbc
 import json
-from feedgen.feed import FeedGenerator
-from flask import make_response
-from urllib.parse import urljoin
-from werkzeug.contrib.atom import AtomFeed
 
-app = Flask(__name__)
-Bootstrap(app)
-
-
-
-def get_abs_url(url):
-    """ Returns absolute url by joining post url with base url """
-    return urljoin(request.url_root, url)
-
-
-@app.route('/feeds/')
-def feeds():
-    feed = AtomFeed(title='All Advertisements feed',
-                    feed_url=request.url, url=request.url_root)
-
-    response = requests.get(settings.API_URL + '/getAdvertisements')
-    posts = response.json()
-
-    for key, value in posts.items():
-        print("key,value: " + key + ", " + value)
-
-    #     feed.add(post.title,
-    #              content_type='html',
-    #              author= post.author_name,
-    #              url=get_abs_url(post.url),
-    #              updated=post.mod_date,
-    #              published=post.created_date)
-
-    # return feed.get_response()
-
-
-@app.route('/rss')
-def rss():
-    fg = FeedGenerator()
-    fg.title('Feed title')
-    fg.description('Feed Description')
-    fg.link(href='https://neighborly-client-v1.azurewebsites.net/')
-    
-
-    response = requests.get(settings.API_URL + '/getAdvertisements')
-    ads = response.json()
-
-    for a in ads: 
-        fe = fg.add_entry()
-        fe.title(a.title)
-        fe.description(a.description)
-
-    response = make_response(fg.rss_str())
-    response.headers.set('Content-Type', 'application/rss+xml')
-    return response
-
-@app.route('/')
-def home():
-    response = requests.get(settings.API_URL + '/getAdvertisements')
-    response2 = requests.get(settings.API_URL + '/getPosts')
-
-    ads = response.json()
-    posts = response2.json()
-    return render_template("index.html", ads=ads, posts=posts)
-
-
-@app.route('/ad/add', methods=['GET'])
-def add_ad_view():
-    return render_template("new_ad.html")
-
-
-@app.route('/ad/edit/<id>', methods=['GET'])
-def edit_ad_view(id):
-    response = requests.get(settings.API_URL + '/getAdvertisement?id=' + id)
-    ad = response.json()
-    return render_template("edit_ad.html", ad=ad)
-
-
-@app.route('/ad/delete/<id>', methods=['GET'])
-def delete_ad_view(id):
-    response = requests.get(settings.API_URL + '/getAdvertisement?id=' + id)
-    ad = response.json()
-    return render_template("delete_ad.html", ad=ad)
-
-@app.route('/ad/view/<id>', methods=['GET'])
-def view_ad_view(id):
-    response = requests.get(settings.API_URL + '/getAdvertisement?id=' + id)
-    ad = response.json()
-    return render_template("view_ad.html", ad=ad)
-
-@app.route('/ad/new', methods=['POST'])
-def add_ad_request():
-    # Get item from the POST body
-    req_data = {
-        'title': request.form['title'],
-        'city': request.form['city'],
-        'description': request.form['description'],
-        'email': request.form['email'],
-        'imgUrl': request.form['imgUrl'],
-        'price': request.form['price']
+# --- In-memory "database" for local testing ---
+ADS_DB = [
+    {
+        "id": 1,
+        "title": "Gardening Service",
+        "city": "Sydney",
+        "description": "I can help with your garden.",
+        "email": "gardener@example.com",
+        "imgUrl": "",
+        "price": "50"
+    },
+    {
+        "id": 2,
+        "title": "Yoga Classes",
+        "city": "Melbourne",
+        "description": "Weekly online yoga sessions.",
+        "email": "yoga@example.com",
+        "imgUrl": "",
+        "price": "30"
     }
-    response = requests.post(settings.API_URL + '/createAdvertisement', json=json.dumps(req_data))
-    return redirect(url_for('home'))
+]
+NEXT_ID = 3
 
-@app.route('/ad/update/<id>', methods=['POST'])
-def update_ad_request(id):
-    # Get item from the POST body
-    req_data = {
-        'title': request.form['title'],
-        'city': request.form['city'],
-        'description': request.form['description'],
-        'email': request.form['email'],
-        'imgUrl': request.form['imgUrl'],
-        'price': request.form['price']
-    }
-    response = requests.put(settings.API_URL + '/updateAdvertisement?id=' + id, json=json.dumps(req_data))
-    return redirect(url_for('home'))
+# --- Initialize app ---
+app = dash.Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    suppress_callback_exceptions=True
+)
+server = app.server
 
-@app.route('/ad/delete/<id>', methods=['POST'])
-def delete_ad_request(id):
-    response = requests.delete(settings.API_URL + '/deleteAdvertisement?id=' + id)
-    if response.status_code == 200:
-        return redirect(url_for('home'))
+# --- Helpers to build UI fragments ---
+def build_ads_cards():
+    """Return a list of Card components based on ADS_DB."""
+    cards = []
+    if not ADS_DB:
+        cards.append(html.P("No advertisements yet."))
 
-# running app
-def main():
-    print(' ----->>>> Flask Python Application running in development server')
-    app.run(host=settings.SERVER_HOST, port=settings.SERVER_PORT, debug=settings.FLASK_DEBUG)
+    for ad in ADS_DB:
+        card_children = []
+        if ad.get('imgUrl'):
+            card_children.append(dbc.CardImg(src=ad['imgUrl'], top=True))
+        card_children.append(
+            dbc.CardBody([
+                html.H4(ad.get('title', 'No title')),
+                html.P(ad.get('description', '')),
+                html.P(f"City: {ad.get('city', '')} | Price: {ad.get('price', '')}"),
+                dbc.Button("Edit", color="warning", href=f"/edit/{ad.get('id')}"),
+                dbc.Button("Delete", color="danger",
+                           id={'type': 'delete-btn', 'index': ad.get('id')},
+                           className='ms-2')
+            ])
+        )
+        cards.append(dbc.Card(card_children, className='mb-3'))
+
+    return cards
+
+def generate_home_layout():
+    return dbc.Container([
+        html.H2("Advertisements"),
+        html.Div(build_ads_cards(), id='ads-list'),
+        html.Br(),
+        dbc.Button("Add Advertisement", id='add-ad-btn', href='/add', color='primary')
+    ])
 
 
+def make_add_layout():
+    return dbc.Container([
+        html.H2("Add New Advertisement"),
+        dbc.Form([
+            dbc.Label("Title"), dbc.Input(id='new-title', type='text'),
+            dbc.Label("City"), dbc.Input(id='new-city', type='text'),
+            dbc.Label("Description"), dbc.Textarea(id='new-description'),
+            dbc.Label("Email"), dbc.Input(id='new-email', type='email'),
+            dbc.Label("Image URL"), dbc.Input(id='new-imgurl', type='text'),
+            dbc.Label("Price"), dbc.Input(id='new-price', type='text'),
+            html.Br(),
+            dbc.Button("Submit", id='submit-new-ad', color='success')
+        ]),
+        html.Br(),
+        dcc.Link("Back to Home", href='/')
+    ])
+
+
+def make_edit_layout(ad):
+    # ad is a dict; prefill values
+    return dbc.Container([
+        html.H2("Edit Advertisement"),
+        dbc.Form([
+            dbc.Label("Title"), dbc.Input(id='edit-title', type='text', value=ad.get('title', '')),
+            dbc.Label("City"), dbc.Input(id='edit-city', type='text', value=ad.get('city', '')),
+            dbc.Label("Description"), dbc.Textarea(id='edit-description', value=ad.get('description', '')),
+            dbc.Label("Email"), dbc.Input(id='edit-email', type='email', value=ad.get('email', '')),
+            dbc.Label("Image URL"), dbc.Input(id='edit-imgurl', type='text', value=ad.get('imgUrl', '')),
+            dbc.Label("Price"), dbc.Input(id='edit-price', type='text', value=ad.get('price', '')),
+            html.Br(),
+            dbc.Button("Save Changes", id='save-edit', color='success')
+        ]),
+        html.Br(),
+        dcc.Link("Back to Home", href='/')
+    ])
+
+
+# --- Main layout with URL routing ---
+app.layout = dbc.Container([
+    dcc.Location(id='url', refresh=False),
+    html.Div(id='page-content')
+], fluid=True)
+
+
+# --- Page routing (renders appropriate layout) ---
+@app.callback(
+    Output('page-content', 'children'),
+    Input('url', 'pathname')
+)
+def display_page(pathname):
+    if pathname == '/add':
+        return make_add_layout()
+    elif pathname and pathname.startswith('/edit/'):
+        # parse id
+        try:
+            ad_id = int(pathname.split('/')[-1])
+        except Exception:
+            return html.P("Invalid ad id in URL.")
+        ad = next((a for a in ADS_DB if a['id'] == ad_id), None)
+        if not ad:
+            return html.P("Advertisement not found.")
+        return make_edit_layout(ad)
+    else:
+        return generate_home_layout()
+
+
+# --- Combined Add / Edit callback
+# This single callback handles both creating a new ad and saving an edited ad.
+# It is the ONLY callback that writes to 'url.href' (so no duplicate-output problems).
+@app.callback(
+    Output('url', 'href'),
+    Input('submit-new-ad', 'n_clicks'),
+    Input('save-edit', 'n_clicks'),
+    State('url', 'pathname'),
+    State('new-title', 'value'),
+    State('new-city', 'value'),
+    State('new-description', 'value'),
+    State('new-email', 'value'),
+    State('new-imgurl', 'value'),
+    State('new-price', 'value'),
+    State('edit-title', 'value'),
+    State('edit-city', 'value'),
+    State('edit-description', 'value'),
+    State('edit-email', 'value'),
+    State('edit-imgurl', 'value'),
+    State('edit-price', 'value'),
+    prevent_initial_call=True
+)
+def handle_add_or_edit(
+    new_click, save_click, pathname,
+    new_title, new_city, new_desc, new_email, new_img, new_price,
+    edit_title, edit_city, edit_desc, edit_email, edit_img, edit_price
+):
+    ctx = callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    global NEXT_ID
+
+    if trigger_id == 'submit-new-ad':
+        # create new ad
+        ADS_DB.append({
+            'id': NEXT_ID,
+            'title': new_title or "",
+            'city': new_city or "",
+            'description': new_desc or "",
+            'email': new_email or "",
+            'imgUrl': new_img or "",
+            'price': new_price or ""
+        })
+        NEXT_ID += 1
+
+    elif trigger_id == 'save-edit':
+        # save edits - pathname contains /edit/<id>
+        try:
+            ad_id = int(pathname.split('/')[-1])
+        except Exception:
+            # invalid id — just go home
+            return '/'
+        for ad in ADS_DB:
+            if ad['id'] == ad_id:
+                ad.update({
+                    'title': edit_title or "",
+                    'city': edit_city or "",
+                    'description': edit_desc or "",
+                    'email': edit_email or "",
+                    'imgUrl': edit_img or "",
+                    'price': edit_price or ""
+                })
+                break
+
+    # After add/edit, navigate back to home (update Location.href)
+    return '/'
+
+
+# --- Delete ad callback ---
+# This updates the ads-list children directly (no effect on url)
+@app.callback(
+    Output('ads-list', 'children'),
+    Input({'type': 'delete-btn', 'index': dash.dependencies.ALL}, 'n_clicks'),
+    prevent_initial_call=True
+)
+def delete_ad(n_clicks_list):
+    ctx = callback_context
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
+
+    # which delete button was pressed
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    try:
+        ad_id = json.loads(button_id)['index']
+    except Exception:
+        raise dash.exceptions.PreventUpdate
+
+    # remove ad
+    global ADS_DB
+    ADS_DB = [ad for ad in ADS_DB if ad['id'] != ad_id]
+
+    # return fresh children for ads-list
+    return build_ads_cards()
+
+
+# --- Run app ---
 if __name__ == '__main__':
-    main()
+    app.run(debug=True, port=8051)
