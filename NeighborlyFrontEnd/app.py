@@ -1,6 +1,6 @@
 # neighborly_dash_local_fixed.py
 import dash
-from dash import html, dcc, Input, Output, State, callback_context
+from dash import html, dcc, Input, Output, State, callback_context, no_update
 import dash_bootstrap_components as dbc
 import json
 
@@ -52,9 +52,12 @@ def build_ads_cards():
                 html.P(ad.get('description', '')),
                 html.P(f"City: {ad.get('city', '')} | Price: {ad.get('price', '')}"),
                 dbc.Button("Edit", color="warning", href=f"/edit/{ad.get('id')}"),
-                dbc.Button("Delete", color="danger",
-                           id={'type': 'delete-btn', 'index': ad.get('id')},
-                           className='ms-2')
+                dbc.Button(
+                    "Delete",
+                    color="danger",
+                    id={'type': 'delete-btn', 'index': ad.get('id')},
+                    className='ms-2'
+                )
             ])
         )
         cards.append(dbc.Card(card_children, className='mb-3'))
@@ -68,7 +71,6 @@ def generate_home_layout():
         html.Br(),
         dbc.Button("Add Advertisement", id='add-ad-btn', href='/add', color='primary')
     ])
-
 
 def make_add_layout():
     return dbc.Container([
@@ -86,7 +88,6 @@ def make_add_layout():
         html.Br(),
         dcc.Link("Back to Home", href='/')
     ])
-
 
 def make_edit_layout(ad):
     # ad is a dict; prefill values
@@ -106,13 +107,42 @@ def make_edit_layout(ad):
         dcc.Link("Back to Home", href='/')
     ])
 
-
 # --- Main layout with URL routing ---
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content')
 ], fluid=True)
 
+# --- Validation layout (declares all possible IDs to silence "nonexistent" warnings) ---
+app.validation_layout = html.Div([
+    dcc.Location(id='url'),
+    html.Div(id='page-content'),
+    # Home skeleton
+    html.Div([
+        html.Div(id='ads-list'),
+        dbc.Button("Add Advertisement", id='add-ad-btn')
+    ]),
+    # Add page skeleton
+    html.Div([
+        dbc.Input(id='new-title'),
+        dbc.Input(id='new-city'),
+        dbc.Textarea(id='new-description'),
+        dbc.Input(id='new-email'),
+        dbc.Input(id='new-imgurl'),
+        dbc.Input(id='new-price'),
+        dbc.Button(id='submit-new-ad')
+    ]),
+    # Edit page skeleton
+    html.Div([
+        dbc.Input(id='edit-title'),
+        dbc.Input(id='edit-city'),
+        dbc.Textarea(id='edit-description'),
+        dbc.Input(id='edit-email'),
+        dbc.Input(id='edit-imgurl'),
+        dbc.Input(id='edit-price'),
+        dbc.Button(id='save-edit')
+    ])
+])
 
 # --- Page routing (renders appropriate layout) ---
 @app.callback(
@@ -135,21 +165,39 @@ def display_page(pathname):
     else:
         return generate_home_layout()
 
-
-# --- Combined Add / Edit callback
-# This single callback handles both creating a new ad and saving an edited ad.
-# It is the ONLY callback that writes to 'url.href' (so no duplicate-output problems).
+# --- Add callback (only references NEW inputs) ---
 @app.callback(
-    Output('url', 'href'),
+    Output('url', 'href', allow_duplicate=True),
     Input('submit-new-ad', 'n_clicks'),
-    Input('save-edit', 'n_clicks'),
-    State('url', 'pathname'),
     State('new-title', 'value'),
     State('new-city', 'value'),
     State('new-description', 'value'),
     State('new-email', 'value'),
     State('new-imgurl', 'value'),
     State('new-price', 'value'),
+    prevent_initial_call=True
+)
+def create_ad(n, title, city, desc, email, img, price):
+    if not n:
+        return no_update
+    global NEXT_ID
+    ADS_DB.append({
+        'id': NEXT_ID,
+        'title': title or "",
+        'city': city or "",
+        'description': desc or "",
+        'email': email or "",
+        'imgUrl': img or "",
+        'price': price or ""
+    })
+    NEXT_ID += 1
+    return '/'  # navigate home
+
+# --- Edit callback (only references EDIT inputs) ---
+@app.callback(
+    Output('url', 'href', allow_duplicate=True),
+    Input('save-edit', 'n_clicks'),
+    State('url', 'pathname'),
     State('edit-title', 'value'),
     State('edit-city', 'value'),
     State('edit-description', 'value'),
@@ -158,57 +206,27 @@ def display_page(pathname):
     State('edit-price', 'value'),
     prevent_initial_call=True
 )
-def handle_add_or_edit(
-    new_click, save_click, pathname,
-    new_title, new_city, new_desc, new_email, new_img, new_price,
-    edit_title, edit_city, edit_desc, edit_email, edit_img, edit_price
-):
-    ctx = callback_context
-    if not ctx.triggered:
-        raise dash.exceptions.PreventUpdate
+def save_ad(n, pathname, title, city, desc, email, img, price):
+    if not n:
+        return no_update
+    try:
+        ad_id = int(pathname.split('/')[-1])
+    except Exception:
+        return '/'  # invalid URL; just go home
+    for ad in ADS_DB:
+        if ad['id'] == ad_id:
+            ad.update({
+                'title': title or "",
+                'city': city or "",
+                'description': desc or "",
+                'email': email or "",
+                'imgUrl': img or "",
+                'price': price or ""
+            })
+            break
+    return '/'  # navigate home
 
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    global NEXT_ID
-
-    if trigger_id == 'submit-new-ad':
-        # create new ad
-        ADS_DB.append({
-            'id': NEXT_ID,
-            'title': new_title or "",
-            'city': new_city or "",
-            'description': new_desc or "",
-            'email': new_email or "",
-            'imgUrl': new_img or "",
-            'price': new_price or ""
-        })
-        NEXT_ID += 1
-
-    elif trigger_id == 'save-edit':
-        # save edits - pathname contains /edit/<id>
-        try:
-            ad_id = int(pathname.split('/')[-1])
-        except Exception:
-            # invalid id — just go home
-            return '/'
-        for ad in ADS_DB:
-            if ad['id'] == ad_id:
-                ad.update({
-                    'title': edit_title or "",
-                    'city': edit_city or "",
-                    'description': edit_desc or "",
-                    'email': edit_email or "",
-                    'imgUrl': edit_img or "",
-                    'price': edit_price or ""
-                })
-                break
-
-    # After add/edit, navigate back to home (update Location.href)
-    return '/'
-
-
-# --- Delete ad callback ---
-# This updates the ads-list children directly (no effect on url)
+# --- Delete ad callback (pattern-matching for dynamic delete buttons) ---
 @app.callback(
     Output('ads-list', 'children'),
     Input({'type': 'delete-btn', 'index': dash.dependencies.ALL}, 'n_clicks'),
@@ -217,22 +235,18 @@ def handle_add_or_edit(
 def delete_ad(n_clicks_list):
     ctx = callback_context
     if not ctx.triggered:
-        raise dash.exceptions.PreventUpdate
+        return no_update
 
     # which delete button was pressed
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     try:
         ad_id = json.loads(button_id)['index']
     except Exception:
-        raise dash.exceptions.PreventUpdate
+        return no_update
 
-    # remove ad
     global ADS_DB
     ADS_DB = [ad for ad in ADS_DB if ad['id'] != ad_id]
-
-    # return fresh children for ads-list
     return build_ads_cards()
-
 
 # --- Run app ---
 if __name__ == '__main__':
