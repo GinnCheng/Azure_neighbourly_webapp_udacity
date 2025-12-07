@@ -1,9 +1,9 @@
 {
-  "IsEncrypted": true,
+  "IsEncrypted": false,
   "Values": {
-    "MyDbConnection": "mongodb+srv://cosmoneighbourlyapp:<password>@cosmodbneighbourlyapp.global.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000"
+    "MyDbConnection": "mongodb+srv://cosmoneighbourlyapp:<password>@cosmodbneighbourlyapp.global.mongocluster.cosmos.azure.com/?tls=true&authMechanism=SCRAM-SHA-256&retrywrites=false&maxIdleTimeMS=120000",
+    "FUNCTIONS_WORKER_RUNTIME": "python"
   },
   "ConnectionStrings": {},
-
-  "AzureWebJobsStorage": ""
+  "Host": {}
 }
