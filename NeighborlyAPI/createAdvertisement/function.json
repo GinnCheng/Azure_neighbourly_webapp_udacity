@@ -2,13 +2,12 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
-      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": [
-        "post"
-      ]
+      "methods": ["post"],
+      "authLevel": "anonymous",
+      "route": "createadvertisement"
     },
     {
       "type": "http",

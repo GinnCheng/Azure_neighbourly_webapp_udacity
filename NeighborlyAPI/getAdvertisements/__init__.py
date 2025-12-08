@@ -1,6 +1,6 @@
 import json
 import azure.functions as func
-from ...shared.db import get_ads_collection
+from shared.db import get_ads_collection
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:

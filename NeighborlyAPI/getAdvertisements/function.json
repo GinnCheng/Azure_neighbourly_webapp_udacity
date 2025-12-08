@@ -2,13 +2,12 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
-      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": [
-        "delete"
-      ]
+      "methods": ["get"],
+      "authLevel": "anonymous",
+      "route": "getadvertisements"
     },
     {
       "type": "http",
@@ -17,3 +16,4 @@
     }
   ]
 }
+
