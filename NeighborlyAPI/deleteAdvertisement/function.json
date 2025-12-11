@@ -2,12 +2,12 @@
   "scriptFile": "__init__.py",
   "bindings": [
     {
+      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
-      "name": "req",
-      "methods": ["delete"],
-      "authLevel": "anonymous",
-      "route": "deleteadvertisement/{id}"
+      "methods": [ "delete" ],
+      "route": "deleteadvertisement/{id}",
+      "name": "req"
     },
     {
       "type": "http",
