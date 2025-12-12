@@ -112,6 +112,7 @@ def generate_home_layout():
 
 def make_add_layout():
     return dbc.Container([
+        dbc.Alert(id="action-feedback", is_open=False),
         html.H2("Add New Advertisement"),
         dbc.Form([
             dbc.Label("Title"), dbc.Input(id="new-title"),
@@ -129,6 +130,7 @@ def make_add_layout():
 
 def make_edit_layout(ad):
     return dbc.Container([
+        dbc.Alert(id="action-feedback", is_open=False),
         html.H2("Edit Advertisement"),
         dbc.Form([
             dbc.Label("Title"), dbc.Input(id="edit-title", value=ad.get("title", "")),
@@ -177,7 +179,10 @@ def display_page(pathname):
 # Create ad
 # =========================
 @app.callback(
-    Output("url", "href", allow_duplicate=True),
+    Output("action-feedback", "is_open", allow_duplicate=True),
+    Output("action-feedback", "children", allow_duplicate=True),
+    Output("action-feedback", "color", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
     Input("submit-new-ad", "n_clicks"),
     State("new-title", "value"),
     State("new-city", "value"),
@@ -189,24 +194,34 @@ def display_page(pathname):
 )
 def create_ad(n, title, city, desc, email, img, price):
     if not n:
-        return no_update
+        raise dash.exceptions.PreventUpdate
 
-    api_create_ad({
-        "title": title,
-        "city": city,
-        "description": desc,
-        "email": email,
-        "imgUrl": img,
-        "price": price
-    })
+    resp = requests.post(
+        f"{API_BASE_URL}/createadvertisement",
+        json={
+            "title": title,
+            "city": city,
+            "description": desc,
+            "email": email,
+            "imgUrl": img,
+            "price": price,
+        }
+    )
 
-    return "/"
+    if resp.status_code == 201:
+        return True, "Advertisement created successfully!", "success", "/"
+
+    return True, f"Error: {resp.text}", "danger", dash.no_update
+
 
 # =========================
 # Update ad
 # =========================
 @app.callback(
-    Output("url", "href", allow_duplicate=True),
+    Output("action-feedback", "is_open", allow_duplicate=True),
+    Output("action-feedback", "children", allow_duplicate=True),
+    Output("action-feedback", "color", allow_duplicate=True),
+    Output("url", "pathname", allow_duplicate=True),
     Input("save-edit", "n_clicks"),
     State("url", "pathname"),
     State("edit-title", "value"),
@@ -217,22 +232,29 @@ def create_ad(n, title, city, desc, email, img, price):
     State("edit-price", "value"),
     prevent_initial_call=True
 )
-def save_ad(n, pathname, title, city, desc, email, img, price):
+def save_edit(n, pathname, title, city, desc, email, img, price):
     if not n:
-        return no_update
+        raise dash.exceptions.PreventUpdate
 
     ad_id = pathname.split("/")[-1]
 
-    api_update_ad(ad_id, {
-        "title": title,
-        "city": city,
-        "description": desc,
-        "email": email,
-        "imgUrl": img,
-        "price": price
-    })
+    resp = requests.put(
+        f"{API_BASE_URL}/updateadvertisement/{ad_id}",
+        json={
+            "title": title,
+            "city": city,
+            "description": desc,
+            "email": email,
+            "imgUrl": img,
+            "price": price,
+        }
+    )
 
-    return "/"
+    if resp.status_code == 200:
+        return True, "Changes saved successfully!", "success", "/"
+
+    return True, f"Error: {resp.text}", "danger", dash.no_update
+
 
 # =========================
 # Delete ad
