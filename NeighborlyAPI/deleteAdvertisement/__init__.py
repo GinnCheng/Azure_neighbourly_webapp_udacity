@@ -3,6 +3,7 @@ import json
 import azure.functions as func
 import pymongo
 import os
+from bson import ObjectId
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -13,7 +14,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         collection = get_ads_collection()
 
-        result = collection.delete_one({"_id": id})
+        result = collection.delete_one({"_id": ObjectId(id)})
 
         if result.deleted_count == 0:
             return func.HttpResponse("Not found", status_code=404)
