@@ -1,2 +1,5 @@
-azure-functions==1.2.1
+azure-functions
 pymongo==3.12.3
+dnspython
+python-dotenv
+

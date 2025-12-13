@@ -1,14 +1,20 @@
 import os
-import pymongo
+from pymongo import MongoClient
+
+def _get_client():
+    url = os.environ["MyDbConnection"]
+    return MongoClient(
+        url,
+        tls=True,
+        tlsAllowInvalidCertificates=True
+    )
 
 def get_ads_collection():
-    url = os.environ["MyDbConnection"]
-    client = pymongo.MongoClient(url)
-    database = client["neighbourlydb"]
-    return database["advertisements"]
+    client = _get_client()
+    db = client["neighbourlydb"]
+    return db["advertisements"]
 
 def get_posts_collection():
-    url = os.environ["MyDbConnection"]
-    client = pymongo.MongoClient(url)
-    database = client["neighbourlydb"]
-    return database["posts"]
+    client = _get_client()
+    db = client["neighbourlydb"]
+    return db["posts"]
