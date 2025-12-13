@@ -80,8 +80,8 @@ def build_ads_cards():
         ad_id = ad["_id"]
         card_children = []
 
-        if ad.get("imgUrl"):
-            card_children.append(dbc.CardImg(src=ad["imgUrl"], top=True))
+        # if ad.get("imgUrl"):
+        #     card_children.append(dbc.CardImg(src=ad["imgUrl"], top=True))
 
         card_children.append(
             dbc.CardBody([
@@ -118,8 +118,6 @@ def make_add_layout():
             dbc.Label("Title"), dbc.Input(id="new-title"),
             dbc.Label("City"), dbc.Input(id="new-city"),
             dbc.Label("Description"), dbc.Textarea(id="new-description"),
-            dbc.Label("Email"), dbc.Input(id="new-email"),
-            dbc.Label("Image URL"), dbc.Input(id="new-imgurl"),
             dbc.Label("Price"), dbc.Input(id="new-price"),
             html.Br(),
             dbc.Button("Submit", id="submit-new-ad", color="success")
@@ -136,8 +134,6 @@ def make_edit_layout(ad):
             dbc.Label("Title"), dbc.Input(id="edit-title", value=ad.get("title", "")),
             dbc.Label("City"), dbc.Input(id="edit-city", value=ad.get("city", "")),
             dbc.Label("Description"), dbc.Textarea(id="edit-description", value=ad.get("description", "")),
-            dbc.Label("Email"), dbc.Input(id="edit-email", value=ad.get("email", "")),
-            dbc.Label("Image URL"), dbc.Input(id="edit-imgurl", value=ad.get("imgUrl", "")),
             dbc.Label("Price"), dbc.Input(id="edit-price", value=ad.get("price", "")),
             html.Br(),
             dbc.Button("Save Changes", id="save-edit", color="success")
@@ -187,12 +183,10 @@ def display_page(pathname):
     State("new-title", "value"),
     State("new-city", "value"),
     State("new-description", "value"),
-    State("new-email", "value"),
-    State("new-imgurl", "value"),
     State("new-price", "value"),
     prevent_initial_call=True
 )
-def create_ad(n, title, city, desc, email, img, price):
+def create_ad(n, title, city, desc, price):
     if not n:
         raise dash.exceptions.PreventUpdate
 
@@ -202,8 +196,6 @@ def create_ad(n, title, city, desc, email, img, price):
             "title": title,
             "city": city,
             "description": desc,
-            "email": email,
-            "imgUrl": img,
             "price": price,
         }
     )
@@ -227,12 +219,10 @@ def create_ad(n, title, city, desc, email, img, price):
     State("edit-title", "value"),
     State("edit-city", "value"),
     State("edit-description", "value"),
-    State("edit-email", "value"),
-    State("edit-imgurl", "value"),
     State("edit-price", "value"),
     prevent_initial_call=True
 )
-def save_edit(n, pathname, title, city, desc, email, img, price):
+def save_edit(n, pathname, title, city, desc, price):
     if not n:
         raise dash.exceptions.PreventUpdate
 
@@ -244,8 +234,6 @@ def save_edit(n, pathname, title, city, desc, email, img, price):
             "title": title,
             "city": city,
             "description": desc,
-            "email": email,
-            "imgUrl": img,
             "price": price,
         }
     )
