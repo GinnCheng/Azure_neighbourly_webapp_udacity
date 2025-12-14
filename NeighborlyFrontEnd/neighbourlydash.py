@@ -12,12 +12,11 @@ from dotenv import load_dotenv
 # =========================
 
 load_dotenv()
-API_BASE_URL = os.getenv(
-    "API_BASE_URL"
-)
+API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 
-if not API_BASE_URL:
-    raise RuntimeError("API_BASE_URL not set")
+if not API_BASE_URL.startswith("https://"):
+    raise RuntimeError("API_BASE_URL must start with https://")
+
 
 # =========================
 # API helper functions
@@ -190,20 +189,31 @@ def create_ad(n, title, city, desc, price):
     if not n:
         raise dash.exceptions.PreventUpdate
 
+    payload = {
+        "title": (title or "").strip(),
+        "city": (city or "").strip(),
+        "description": (desc or "").strip(),
+        "price": (price or "").strip(),
+    }
+
     resp = requests.post(
         f"{API_BASE_URL}/createadvertisement",
-        json={
-            "title": title,
-            "city": city,
-            "description": desc,
-            "price": price,
-        }
+        data=json.dumps(payload),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        timeout=15,
+        allow_redirects = False,
     )
+    if resp.status_code in (301, 302, 307, 308):
+        return True, f"Redirected to: {resp.headers.get('Location')}. Use https API_BASE_URL.", "danger", dash.no_update
 
     if resp.status_code == 201:
         return True, "Advertisement created successfully!", "success", "/"
 
     return True, f"Error: {resp.text}", "danger", dash.no_update
+
 
 
 # =========================
@@ -226,22 +236,47 @@ def save_edit(n, pathname, title, city, desc, price):
     if not n:
         raise dash.exceptions.PreventUpdate
 
-    ad_id = pathname.split("/")[-1]
+    # 从 /edit/<id> 里拿 id
+    try:
+        ad_id = pathname.split("/")[-1]
+    except Exception:
+        return True, "Invalid advertisement ID.", "danger", dash.no_update
 
-    resp = requests.put(
-        f"{API_BASE_URL}/updateadvertisement/{ad_id}",
-        json={
-            "title": title,
-            "city": city,
-            "description": desc,
-            "price": price,
-        }
-    )
+    payload = {
+        "title": (title or "").strip(),
+        "city": (city or "").strip(),
+        "description": (desc or "").strip(),
+        "price": (price or "").strip(),
+    }
+
+    # 防御式：全部为空就不打 API
+    if not any(payload.values()):
+        return True, "Please update at least one field.", "warning", dash.no_update
+
+    try:
+        resp = requests.put(
+            f"{API_BASE_URL}/updateadvertisement/{ad_id}",
+            data=json.dumps(payload),  # ⚠️ 关键：不要用 json=
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            timeout=15,
+            allow_redirects=False,
+        )
+        if resp.status_code in (301, 302, 307, 308):
+            return True, f"Redirected to: {resp.headers.get('Location')}. Use https API_BASE_URL.", "danger", dash.no_update
+    except Exception as e:
+        return True, f"Network error: {e}", "danger", dash.no_update
 
     if resp.status_code == 200:
         return True, "Changes saved successfully!", "success", "/"
 
+    if resp.status_code == 404:
+        return True, "Advertisement not found.", "warning", dash.no_update
+
     return True, f"Error: {resp.text}", "danger", dash.no_update
+
 
 
 # =========================
