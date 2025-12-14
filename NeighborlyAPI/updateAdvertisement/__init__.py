@@ -4,7 +4,6 @@ from shared.db import get_ads_collection
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 
-
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         ad_id = req.route_params.get("id")
@@ -16,15 +15,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         except InvalidId:
             return func.HttpResponse("Invalid id format", status_code=400)
 
-        req_body = req.get_json()
-        if not req_body:
+        raw_body = req.get_body()
+        if not raw_body:
             return func.HttpResponse("Empty request body", status_code=400)
 
-        collection = get_ads_collection()
+        try:
+            data = json.loads(raw_body.decode("utf-8"))
+        except Exception:
+            return func.HttpResponse("Invalid JSON", status_code=400)
 
+        if not isinstance(data, dict):
+            return func.HttpResponse("JSON must be an object", status_code=400)
+
+        collection = get_ads_collection()
         result = collection.update_one(
             {"_id": obj_id},
-            {"$set": req_body}
+            {"$set": data}
         )
 
         if result.matched_count == 0:
@@ -37,7 +43,4 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except Exception as e:
-        return func.HttpResponse(
-            f"Error: {str(e)}",
-            status_code=500
-        )
+        return func.HttpResponse(f"Error: {str(e)}", status_code=500)
