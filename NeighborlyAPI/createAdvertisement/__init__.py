@@ -1,6 +1,7 @@
 import json
 import azure.functions as func
 from shared.db import get_ads_collection
+from shared.event_grid import publish_ad_created_event  # 👈 新增
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -18,8 +19,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         collection = get_ads_collection()
         result = collection.insert_one(data)
-
         data["_id"] = str(result.inserted_id)
+
+        # ✅ 只加这一行
+        publish_ad_created_event(data)
 
         return func.HttpResponse(
             json.dumps(data),
