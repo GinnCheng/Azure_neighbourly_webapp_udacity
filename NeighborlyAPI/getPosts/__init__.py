@@ -8,11 +8,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         posts = []
 
         for doc in collection.find():
+            # ✅ 关键修复：ObjectId → string
+            if "_id" in doc:
+                doc["_id"] = str(doc["_id"])
+
             posts.append(doc)
 
         return func.HttpResponse(
             json.dumps(posts),
-            mimetype="application/json"
+            mimetype="application/json",
+            status_code=200
         )
 
     except Exception as e:
