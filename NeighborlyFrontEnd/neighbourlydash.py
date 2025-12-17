@@ -12,7 +12,9 @@ API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 if not API_BASE_URL.startswith("https://"):
     raise RuntimeError("API_BASE_URL must start with https://")
 
+# =========================
 # API helper functions
+# =========================
 
 def api_get_ads():
     r = requests.get(f"{API_BASE_URL}/getadvertisements")
@@ -46,10 +48,13 @@ def api_get_post(post_id):
     r.raise_for_status()
     return r.json()
 
+# =========================
+# Dash app init
+# =========================
+
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 server = app.server
 
-# Sidebar layout
 sidebar = dbc.Col([
     html.H2("My Neighborhood", className="display-6"),
     html.Hr(),
@@ -59,7 +64,6 @@ sidebar = dbc.Col([
     ], vertical=True, pills=True),
 ], width=2)
 
-# Main content container
 content = dbc.Col(html.Div(id="page-content"), width=10)
 
 app.layout = dbc.Container([
@@ -67,7 +71,9 @@ app.layout = dbc.Container([
     dbc.Row([sidebar, content])
 ], fluid=True)
 
-# Ad card UI
+# =========================
+# UI builders
+# =========================
 
 def build_ads_cards():
     try:
@@ -92,8 +98,6 @@ def build_ads_cards():
         ], className="mb-3"))
     return cards
 
-# Post card UI
-
 def build_post_cards():
     try:
         posts = api_get_posts()
@@ -105,16 +109,26 @@ def build_post_cards():
 
     cards = []
     for post in posts:
+        post_id = post["_id"]
         cards.append(dbc.Card([
             dbc.CardBody([
                 html.H5(post.get("title", "Untitled")),
-                html.P(post.get("content", "")),
-                html.P(f"Author: {post.get('author', 'Unknown')} | Category: {post.get('category', '')}")
+                html.P(post.get("content", "")[:100] + "..."),
+                html.P(f"Author: {post.get('author', 'Unknown')} | Category: {post.get('category', '')}"),
+                dbc.Button("View Details", href=f"/post/{post_id}", color="primary", size="sm")
             ])
         ], className="mb-3"))
     return cards
 
-# Layouts
+def make_post_detail_layout(post):
+    return dbc.Container([
+        html.H2(post.get("title", "")),
+        html.P(post.get("content", "")),
+        html.P(f"Author: {post.get('author', '')}"),
+        html.P(f"Date: {post.get('date', '')}"),
+        html.Br(),
+        dcc.Link("Back to News", href="/posts")
+    ])
 
 def layout_ads():
     return dbc.Container([
@@ -157,7 +171,10 @@ def layout_posts():
         html.Div(build_post_cards())
     ])
 
+# =========================
 # Routing
+# =========================
+
 @app.callback(Output("page-content", "children"), Input("url", "pathname"))
 def display_page(pathname):
     if pathname == "/add":
@@ -171,9 +188,19 @@ def display_page(pathname):
             return html.P("Ad not found.")
     if pathname == "/posts":
         return layout_posts()
+    if pathname and pathname.startswith("/post/"):
+        post_id = pathname.split("/")[-1]
+        try:
+            post = api_get_post(post_id)
+            return make_post_detail_layout(post)
+        except:
+            return html.P("Post not found.")
     return layout_ads()
 
-# Create ad callback
+# =========================
+# Create ad
+# =========================
+
 @app.callback(
     Output("action-feedback", "is_open", allow_duplicate=True),
     Output("action-feedback", "children", allow_duplicate=True),
@@ -205,7 +232,10 @@ def create_ad(n, title, city, desc, price):
     except Exception as e:
         return True, f"Network error: {e}", "danger", dash.no_update
 
-# Edit ad callback
+# =========================
+# Update ad
+# =========================
+
 @app.callback(
     Output("action-feedback", "is_open", allow_duplicate=True),
     Output("action-feedback", "children", allow_duplicate=True),
@@ -247,7 +277,10 @@ def save_edit(n, pathname, title, city, desc, price):
     except Exception as e:
         return True, f"Network error: {e}", "danger", dash.no_update
 
-# Delete ad callback
+# =========================
+# Delete ad
+# =========================
+
 @app.callback(
     Output("ads-list", "children"),
     Input({"type": "delete-btn", "index": dash.dependencies.ALL}, "n_clicks"),
